@@ -110,13 +110,13 @@ jobs:
         shell: pwsh
         run: ./tools/build_parser_helpers.ps1 -Clean
 
-      - name: Build installers and create draft release
+      - name: Build installers and publish release
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           tagName: ${{ steps.release.outputs.tag }}
           releaseName: PhiReader ${{ steps.release.outputs.tag }}
-          releaseDraft: true
+          releaseDraft: false
           prerelease: false
           includeUpdaterJson: false
