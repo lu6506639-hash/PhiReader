@@ -1,0 +1,5 @@
+pypdf==6.7.2
+pdfplumber==0.11.9
+pypdfium2==5.7.1
+fonttools==4.61.1
+pyinstaller>=6.0,<7

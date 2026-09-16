@@ -1,0 +1,21 @@
+[package]
+name = "phireader"
+version = "0.1.0"
+description = "PhiReader desktop shell"
+authors = ["PhiReader"]
+license = "MIT"
+edition = "2021"
+
+[build-dependencies]
+tauri-build = { version = "2.0.0", features = [] }
+
+[dependencies]
+tauri = { version = "2.0.0", features = [] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+keyring = "3"
+reqwest = { version = "0.13.1", features = ["json"] }
+
+[features]
+custom-protocol = ["tauri/custom-protocol"]
+default = ["custom-protocol"]

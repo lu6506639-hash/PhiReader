@@ -1,0 +1,38 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "PhiReader",
+  "version": "0.1.0",
+  "identifier": "com.phireader.desktop",
+  "build": {
+    "beforeDevCommand": "npm run dev",
+    "beforeBuildCommand": "npm run build",
+    "devUrl": "http://127.0.0.1:1420",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "PhiReader",
+        "width": 1440,
+        "height": 900,
+        "minWidth": 1100,
+        "minHeight": 720,
+        "dragDropEnabled": false,
+        "resizable": true
+      }
+    ],
+    "security": { "csp": null }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "resources": {
+      "../parser/extract.py": "parser/extract.py",
+      "../parser/render_page.py": "parser/render_page.py",
+      "../parser/release/": "parser/release/"
+    },
+    "icon": ["icons/ICON2.png", "icons/icon.ico"],
+    "category": "Education",
+    "shortDescription": "Academic paper reader with symbol definitions"
+  }
+}
