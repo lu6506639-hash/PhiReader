@@ -103,10 +103,18 @@ jobs:
         run: |
           $path = "src-tauri/tauri.conf.json"
           $config = Get-Content $path -Raw | ConvertFrom-Json
+          # MSI only accepts numeric versions and therefore cannot package a
+          # semver prerelease such as 0.1.1-beta.1. NSIS supports prerelease
+          # versions and is the updater artifact used for the beta channel.
+          $config.bundle.targets = "nsis"
           $config.plugins.updater.endpoints = @(
             "https://github.com/$env:GITHUB_REPOSITORY/releases/download/beta/latest.json"
           )
           $config | ConvertTo-Json -Depth 100 | Set-Content $path -Encoding utf8
+          $verified = Get-Content $path -Raw | ConvertFrom-Json
+          if ($verified.bundle.targets -ne 'nsis') {
+            throw "Beta builds must use the NSIS target; resolved target was '$($verified.bundle.targets)'."
+          }
 
       - name: Build frontend
         run: npm run build
