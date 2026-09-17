@@ -1,0 +1,56 @@
+name: Bug 报告
+description: 报告可复现的异常、崩溃或识别问题
+title: "[Bug] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        感谢反馈。请勿上传包含隐私或未公开内容的论文；如需示例，可提供能够复现问题的公开 PDF 链接。
+  - type: textarea
+    id: problem
+    attributes:
+      label: 问题描述
+      description: 实际发生了什么？
+      placeholder: 请尽量具体地描述异常表现。
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: 复现步骤
+      placeholder: |
+        1. 打开……
+        2. 点击……
+        3. 出现……
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: 预期表现
+      description: 你原本预期看到什么？
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: PhiReader 版本
+      placeholder: 例如 0.1.1
+    validations:
+      required: true
+  - type: dropdown
+    id: system
+    attributes:
+      label: 操作系统
+      options:
+        - Windows 11
+        - Windows 10
+        - 其他
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: 补充信息
+      description: 可附上截图、公开 PDF 链接或相关日志。请先移除敏感信息。

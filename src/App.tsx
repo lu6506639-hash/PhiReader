@@ -1,18 +1,20 @@
 import { useEffect, useMemo, useRef, useState, type DragEvent as ReactDragEvent, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent } from 'react'
 import { invoke } from '@tauri-apps/api/core'
+import { openUrl } from '@tauri-apps/plugin-opener'
 import { relaunch } from '@tauri-apps/plugin-process'
 import { check, type Update } from '@tauri-apps/plugin-updater'
 import katex from 'katex'
 import 'katex/dist/katex.min.css'
 import {
   ArrowLeft, BookOpen, Check, ChevronLeft, ChevronRight, CircleHelp, FileText, Folder, FolderOpen,
-  FolderPlus, Library, Moon, MoreHorizontal, Plus, Search, Settings, Sparkles, Sun,
+  FolderPlus, Library, MessageSquarePlus, Moon, MoreHorizontal, Plus, Search, Settings, Sparkles, Sun,
   Download, RefreshCw, RotateCcw, Trash2, Upload, X, ZoomIn, ZoomOut,
 } from 'lucide-react'
 import { papers as seedPapers } from './lib/mockData'
 import type { Paper, PaperFolder, ParserResponse, RenderResponse, StoredPaperResponse, SymbolDefinition, View } from './lib/types'
 import { getCopy, type Language } from './lib/i18n'
 import { displayAuthors } from './lib/authorDisplay'
+import packageJson from '../package.json'
 
 const formula = 'V ≈ WH'
 
@@ -23,6 +25,47 @@ const DEEPSEEK_CHAT_ENDPOINT = 'https://api.deepseek.com/chat/completions'
 const SIDEBAR_MIN_WIDTH = 180
 const SIDEBAR_MAX_WIDTH = 420
 const SIDEBAR_DEFAULT_WIDTH = 242
+const GITHUB_NEW_ISSUE_URL = 'https://github.com/lu6506639-hash/PhiReader/issues/new'
+
+function feedbackIssueUrl(language: Language): string {
+  const isEnglish = language === 'en'
+  const body = isEnglish
+    ? [
+        '## Feedback',
+        '<!-- Tell us what happened or what you would like PhiReader to improve. -->',
+        '',
+        '## Steps to reproduce',
+        '1. ',
+        '',
+        '## Expected behavior',
+        '',
+        '## Diagnostics (automatically filled)',
+        `- PhiReader version: ${packageJson.version}`,
+        `- Interface language: ${language}`,
+        `- Runtime: ${isDesktop() ? 'Tauri desktop' : 'Web preview'}`,
+        `- System: ${navigator.userAgent}`,
+      ]
+    : [
+        '## 反馈内容',
+        '<!-- 请描述遇到的问题，或希望 PhiReader 如何改进。 -->',
+        '',
+        '## 复现步骤',
+        '1. ',
+        '',
+        '## 预期表现',
+        '',
+        '## 诊断信息（自动填写）',
+        `- PhiReader 版本：${packageJson.version}`,
+        `- 界面语言：${language}`,
+        `- 运行环境：${isDesktop() ? 'Tauri 桌面端' : '网页预览'}`,
+        `- 系统信息：${navigator.userAgent}`,
+      ]
+  const params = new URLSearchParams({
+    title: isEnglish ? '[Feedback] ' : '[反馈] ',
+    body: body.join('\n'),
+  })
+  return `${GITHUB_NEW_ISSUE_URL}?${params.toString()}`
+}
 
 type ModelProvider = 'qwen' | 'deepseek' | 'custom'
 type ModelConfig = { provider: ModelProvider; label: string; endpoint: string; model: string }
@@ -991,6 +1034,16 @@ function App() {
     notify(language === 'en' ? 'Paper title updated' : '论文标题已更新')
   }
 
+  async function openFeedbackIssue() {
+    const url = feedbackIssueUrl(language)
+    try {
+      if (isDesktop()) await openUrl(url)
+      else window.open(url, '_blank', 'noopener,noreferrer')
+    } catch (error) {
+      notify(`${language === 'en' ? 'Could not open GitHub' : '无法打开 GitHub'}：${error instanceof Error ? error.message : String(error)}`)
+    }
+  }
+
   return (
       <div className={dark ? 'app-shell dark' : 'app-shell light'} style={{ '--ui-scale': fontSize / 17, '--sidebar-width': `${sidebarWidth}px` } as React.CSSProperties} onDragEnter={handleDragEnter} onDragOver={handleDragOver} onDragLeave={handleDragLeave} onDrop={handleDrop}>
       <aside className="sidebar">
@@ -1014,7 +1067,7 @@ function App() {
       <div className={sidebarResizing ? 'app-sidebar-resize-handle dragging' : 'app-sidebar-resize-handle'} role="separator" aria-orientation="vertical" aria-label={language === 'en' ? 'Resize left sidebar' : '调整左侧边栏宽度'} aria-valuemin={SIDEBAR_MIN_WIDTH} aria-valuemax={SIDEBAR_MAX_WIDTH} aria-valuenow={sidebarWidth} tabIndex={0} onPointerDown={startSidebarResize} onKeyDown={handleSidebarResizeKey} />
 
       <main className="main-area">
-        {view === 'library' && <LibraryView language={language} papers={filteredPapers} query={query} setQuery={updateLibraryQuery} folderName={activeFolder?.name} selectedPaperIds={selectedPaperIds} onToggleSelection={togglePaperSelection} onToggleAllSelection={toggleAllPaperSelection} onBatchDelete={() => void removeSelectedPapers()} onImport={() => fileRef.current?.click()} onOpen={openPaper} onRename={renamePaper} onManageFolders={openFolderAssignment} onDelete={removePaper} />}
+        {view === 'library' && <LibraryView language={language} papers={filteredPapers} query={query} setQuery={updateLibraryQuery} folderName={activeFolder?.name} selectedPaperIds={selectedPaperIds} onToggleSelection={togglePaperSelection} onToggleAllSelection={toggleAllPaperSelection} onBatchDelete={() => void removeSelectedPapers()} onImport={() => fileRef.current?.click()} onFeedback={() => void openFeedbackIssue()} onOpen={openPaper} onRename={renamePaper} onManageFolders={openFolderAssignment} onDelete={removePaper} />}
         {view === 'reader' && activePaper && <ReaderView language={language} paper={activePaper} pageNumber={readingPages[activePaper.id] ?? 1} onPageChange={(page) => updateReadingPage(activePaper.id, page)} symbol={activeSymbol} onSelectSymbol={setActiveSymbol} onBack={() => setView('library')} onGenerateSummaries={() => void enrichSymbolMeanings(activePaper.id, activePaper.filePath ?? '', activePaper.parsePath ?? '', activePaper.symbols, true)} summaryBusy={summaryBusyPaperId === activePaper.id} fontSize={fontSize} />}
         {view === 'reader' && !activePaper && <EmptyReader language={language} onBack={() => setView('library')} />}
       {view === 'settings' && <SettingsView language={language} setInterfaceLanguage={setInterfaceLanguage} summaryLanguage={summaryLanguage} setSummaryLanguage={(value) => { setSummaryLanguage(value); localStorage.setItem('phireader.summaryLanguage', value) }} dark={dark} onToggleTheme={() => { setDark((value) => { const next = !value; localStorage.setItem('phireader.dark', String(next)); return next }) }} fontSize={fontSize} setFontSize={(value) => { setFontSize(value); localStorage.setItem('phireader.fontSize', String(value)) }} apiKey={apiKey} apiKeyConfigured={apiKeyConfigured} setApiKey={(value) => updateApiKey(modelProvider, value)} modelProvider={modelProvider} setModelProvider={(value) => { setModelProvider(value); localStorage.setItem('phireader.modelProvider', value); if (value !== 'custom') { const fallback = PROVIDER_MODELS[value][0]; setModelName((current) => PROVIDER_MODELS[value].includes(current) ? current : fallback); localStorage.setItem('phireader.modelName', PROVIDER_MODELS[value].includes(modelName) ? modelName : fallback) } }} modelName={modelName} setModelName={(value) => { setModelName(value); localStorage.setItem('phireader.modelName', value) }} customModelName={customModelName} setCustomModelName={(value) => { setCustomModelName(value); localStorage.setItem('phireader.customModelName', value) }} customEndpoint={customEndpoint} setCustomEndpoint={(value) => { setCustomEndpoint(value); localStorage.setItem('phireader.customEndpoint', value) }} />}
@@ -1077,7 +1130,7 @@ function PaperReaderStatus({ language, paper }: { language: Language; paper: Pap
   return <div className="document-view render-state reader-status-card"><Sparkles size={28} /><strong>{failed ? copy.parseFailedTitle : copy.parsingTitle}</strong><span>{failed ? paper.parseError || copy.parseFailedHint : copy.parsingHint}</span></div>
 }
 
-function LibraryView({ language, papers, query, setQuery, folderName, selectedPaperIds, onToggleSelection, onToggleAllSelection, onBatchDelete, onImport, onOpen, onRename, onManageFolders, onDelete }: { language: Language; papers: Paper[]; query: string; setQuery: (value: string) => void; folderName?: string; selectedPaperIds: Set<string>; onToggleSelection: (paperId: string, selected: boolean) => void; onToggleAllSelection: (selected: boolean, papers: Paper[]) => void; onBatchDelete: () => void; onImport: () => void; onOpen: (paper: Paper) => void; onRename: (paper: Paper) => void; onManageFolders: (paper: Paper) => void; onDelete: (paper: Paper) => void }) {
+function LibraryView({ language, papers, query, setQuery, folderName, selectedPaperIds, onToggleSelection, onToggleAllSelection, onBatchDelete, onImport, onFeedback, onOpen, onRename, onManageFolders, onDelete }: { language: Language; papers: Paper[]; query: string; setQuery: (value: string) => void; folderName?: string; selectedPaperIds: Set<string>; onToggleSelection: (paperId: string, selected: boolean) => void; onToggleAllSelection: (selected: boolean, papers: Paper[]) => void; onBatchDelete: () => void; onImport: () => void; onFeedback: () => void; onOpen: (paper: Paper) => void; onRename: (paper: Paper) => void; onManageFolders: (paper: Paper) => void; onDelete: (paper: Paper) => void }) {
   const copy = getCopy(language).library
   const selectablePapers = papers.filter((paper) => paper.parseStatus !== 'parsing')
   const selectedVisibleCount = selectablePapers.filter((paper) => selectedPaperIds.has(paper.id)).length
@@ -1085,7 +1138,7 @@ function LibraryView({ language, papers, query, setQuery, folderName, selectedPa
   return <div className="page-content library-page">
     <header className="page-header">
       <div><div className="eyebrow">{copy.eyebrow} <span className="eyebrow-line" /></div><h1>{folderName ?? copy.title}</h1><p className="page-subtitle">{folderName ? copy.folderSubtitle(folderName) : copy.subtitle}</p></div>
-      <div className="header-actions"><button className="icon-button" title={copy.help}><CircleHelp size={18} /></button><button className="primary-button" onClick={onImport}><Plus size={17} />{copy.import}</button></div>
+      <div className="header-actions"><button className="feedback-button" type="button" onClick={onFeedback}><MessageSquarePlus size={16} /><span>{copy.feedback}</span></button><button className="primary-button" onClick={onImport}><Plus size={17} />{copy.import}</button></div>
     </header>
     <section className="library-toolbar"><div className="search-box"><Search size={17} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={copy.search} /></div><div className="library-selection-actions"><label className="select-all-control"><input type="checkbox" aria-label={copy.selectAll} checked={allVisibleSelected} disabled={selectablePapers.length === 0} onChange={(event) => onToggleAllSelection(event.target.checked, papers)} /><span>{copy.selectAll}</span></label>{selectedVisibleCount > 0 && <button className="batch-delete-button" onClick={onBatchDelete}>{copy.batchDelete} ({selectedVisibleCount})</button>}</div></section>
     <section className="library-summary"><div><span className="summary-number">{papers.length}</span><span className="summary-label">{copy.papers}</span></div><div><span className="summary-number mint-text">{papers.reduce((total, paper) => total + paper.symbols.length, 0)}</span><span className="summary-label">{copy.parsed}</span></div><div><span className="summary-number amber-text">{papers.filter((paper) => paper.progress < 100).length.toString().padStart(2, '0')}</span><span className="summary-label">{copy.pending}</span></div><span className="summary-note"><Sparkles size={14} /> {copy.note}</span></section>

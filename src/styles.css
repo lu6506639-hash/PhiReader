@@ -58,6 +58,9 @@ h1, h2, h3, p { margin: 0; } h1 { margin-top: 15px; font: 500 49px/.95 'Newsread
 .header-actions, .reader-tools { display: flex; gap: 9px; align-items: center; }
 .icon-button { display: inline-grid; place-items: center; width: 35px; height: 35px; border: 1px solid var(--line); border-radius: 7px; color: var(--muted); background: transparent; transition: .2s; }
 .icon-button:hover { color: var(--ink); border-color: var(--line-strong); background: var(--surface-2); }
+.feedback-button { display: inline-flex; align-items: center; gap: 7px; min-height: 35px; padding: 0 12px; border: 1px solid var(--line-strong); border-radius: 7px; color: var(--muted); background: transparent; font-size: 9px; white-space: nowrap; transition: color .2s, border-color .2s, background .2s, transform .2s; }
+.feedback-button:hover { color: var(--ink); border-color: color-mix(in srgb, var(--mint) 58%, var(--line-strong)); background: color-mix(in srgb, var(--mint) 8%, transparent); transform: translateY(-1px); }
+.feedback-button:focus-visible { outline: 1px solid var(--mint); outline-offset: 2px; }
 .primary-button { display: flex; align-items: center; gap: 8px; padding: 11px 15px; border-radius: 7px; background: var(--accent); color: #24170d; font-size: 10px; font-weight: 600; box-shadow: 0 8px 24px rgba(233,166,101,.16); transition: transform .2s; }
 .primary-button:hover { transform: translateY(-2px); }
 .summary-button { display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 9px; border: 1px solid rgba(213,139,255,.42); border-radius: 6px; color: var(--accent); background: rgba(213,139,255,.08); font-size: 9px; font-weight: 600; white-space: nowrap; }
@@ -256,6 +259,8 @@ html, body, #root { height: 100%; overflow: hidden; }
 .add-card { min-height: 86px; grid-column: 1; border-radius: 7px; }
 
 @media (max-width: 760px) {
+  .feedback-button span { display: none; }
+  .feedback-button { width: 35px; padding: 0; justify-content: center; }
   .paper-card,
   .paper-card.featured { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto auto auto; }
   .paper-card-body,

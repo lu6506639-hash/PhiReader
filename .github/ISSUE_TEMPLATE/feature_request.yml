@@ -1,0 +1,29 @@
+name: 功能建议
+description: 提议新的工作流或现有体验改进
+title: "[Feature] "
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: scenario
+    attributes:
+      label: 使用场景
+      description: 你在阅读论文时遇到了什么困难？
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: 建议方案
+      description: 希望 PhiReader 如何解决这个问题？
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: 目前的替代方式
+      description: 现在如何完成这件事？可以留空。
+  - type: textarea
+    id: context
+    attributes:
+      label: 补充信息
+      description: 可附上参考产品、界面草图或其他上下文。
