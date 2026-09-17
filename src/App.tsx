@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useRef, useState, type DragEvent as ReactDragEvent, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent } from 'react'
 import { invoke } from '@tauri-apps/api/core'
+import { relaunch } from '@tauri-apps/plugin-process'
+import { check, type Update } from '@tauri-apps/plugin-updater'
 import katex from 'katex'
 import 'katex/dist/katex.min.css'
 import {
   ArrowLeft, BookOpen, Check, ChevronLeft, ChevronRight, CircleHelp, FileText, Folder, FolderOpen,
   FolderPlus, Library, Moon, MoreHorizontal, Plus, Search, Settings, Sparkles, Sun,
-  RotateCcw, Trash2, Upload, X, ZoomIn, ZoomOut,
+  Download, RefreshCw, RotateCcw, Trash2, Upload, X, ZoomIn, ZoomOut,
 } from 'lucide-react'
 import { papers as seedPapers } from './lib/mockData'
 import type { Paper, PaperFolder, ParserResponse, RenderResponse, StoredPaperResponse, SymbolDefinition, View } from './lib/types'
@@ -306,6 +308,11 @@ function App() {
   const [sidebarResizing, setSidebarResizing] = useState(false)
   const [providerApiKeyStatus, setProviderApiKeyStatus] = useState<ProviderApiKeyStatus>({ ...EMPTY_PROVIDER_API_KEY_STATUS })
   const [providerApiKeyDrafts, setProviderApiKeyDrafts] = useState<ProviderApiKeyDrafts>({ ...EMPTY_PROVIDER_API_KEY_DRAFTS })
+  const [availableUpdate, setAvailableUpdate] = useState<Update | null>(null)
+  const [updateStatus, setUpdateStatus] = useState<'available' | 'downloading' | 'installing' | 'error'>('available')
+  const [updateProgress, setUpdateProgress] = useState<number | null>(null)
+  const [updateError, setUpdateError] = useState('')
+  const updateCheckStarted = useRef(false)
   const language = interfaceLanguage
   const copy = getCopy(interfaceLanguage)
   const apiKey = providerApiKeyDrafts[modelProvider]
@@ -321,6 +328,16 @@ function App() {
   useEffect(() => {
     activePaperIdRef.current = activePaperId
   }, [activePaperId])
+
+  useEffect(() => {
+    if (!isDesktop() || updateCheckStarted.current) return
+    updateCheckStarted.current = true
+    void check().then((update) => {
+      if (update) setAvailableUpdate(update)
+    }).catch((error) => {
+      console.warn('Unable to check for PhiReader updates', error)
+    })
+  }, [])
 
   useEffect(() => {
     if (!isDesktop()) return
@@ -390,6 +407,33 @@ function App() {
   function notify(message: string) {
     setToast(message)
     window.setTimeout(() => setToast(''), 2600)
+  }
+
+  async function installAvailableUpdate() {
+    if (!availableUpdate || updateStatus === 'downloading' || updateStatus === 'installing') return
+    setUpdateStatus('downloading')
+    setUpdateError('')
+    setUpdateProgress(0)
+    let downloaded = 0
+    let contentLength = 0
+    try {
+      await availableUpdate.downloadAndInstall((event) => {
+        if (event.event === 'Started') {
+          contentLength = event.data.contentLength ?? 0
+        } else if (event.event === 'Progress') {
+          downloaded += event.data.chunkLength
+          setUpdateProgress(contentLength > 0 ? Math.min(100, Math.round(downloaded / contentLength * 100)) : null)
+        } else if (event.event === 'Finished') {
+          setUpdateProgress(100)
+          setUpdateStatus('installing')
+        }
+      })
+      setUpdateStatus('installing')
+      await relaunch()
+    } catch (error) {
+      setUpdateStatus('error')
+      setUpdateError(error instanceof Error ? error.message : String(error))
+    }
   }
 
   function updateApiKey(provider: ModelProvider, value: string) {
@@ -976,11 +1020,50 @@ function App() {
       {view === 'settings' && <SettingsView language={language} setInterfaceLanguage={setInterfaceLanguage} summaryLanguage={summaryLanguage} setSummaryLanguage={(value) => { setSummaryLanguage(value); localStorage.setItem('phireader.summaryLanguage', value) }} dark={dark} onToggleTheme={() => { setDark((value) => { const next = !value; localStorage.setItem('phireader.dark', String(next)); return next }) }} fontSize={fontSize} setFontSize={(value) => { setFontSize(value); localStorage.setItem('phireader.fontSize', String(value)) }} apiKey={apiKey} apiKeyConfigured={apiKeyConfigured} setApiKey={(value) => updateApiKey(modelProvider, value)} modelProvider={modelProvider} setModelProvider={(value) => { setModelProvider(value); localStorage.setItem('phireader.modelProvider', value); if (value !== 'custom') { const fallback = PROVIDER_MODELS[value][0]; setModelName((current) => PROVIDER_MODELS[value].includes(current) ? current : fallback); localStorage.setItem('phireader.modelName', PROVIDER_MODELS[value].includes(modelName) ? modelName : fallback) } }} modelName={modelName} setModelName={(value) => { setModelName(value); localStorage.setItem('phireader.modelName', value) }} customModelName={customModelName} setCustomModelName={(value) => { setCustomModelName(value); localStorage.setItem('phireader.customModelName', value) }} customEndpoint={customEndpoint} setCustomEndpoint={(value) => { setCustomEndpoint(value); localStorage.setItem('phireader.customEndpoint', value) }} />}
       </main>
       {folderPaper && <FolderAssignmentDialog language={language} paper={folderPaper} folders={folders} selectedIds={folderDraftIds} saving={folderSaving} onToggle={toggleFolderAssignment} onCreateFolder={async () => { const folder = await createPaperFolder(false); if (folder) setFolderDraftIds((current) => new Set(current).add(folder.id)) }} onClose={() => { if (!folderSaving) setFolderPaper(null) }} onSave={() => void saveFolderAssignment()} />}
+      {availableUpdate && <UpdateDialog language={language} update={availableUpdate} status={updateStatus} progress={updateProgress} error={updateError} onClose={() => setAvailableUpdate(null)} onInstall={() => void installAvailableUpdate()} />}
       <input ref={fileRef} type="file" accept="application/pdf,.pdf" multiple hidden onChange={(event) => { if (event.target.files?.length) importPapers(event.target.files); event.target.value = '' }} />
       {dragActive && <div className="quick-upload-overlay" role="status" aria-live="polite"><div className="quick-upload-target"><span className="quick-upload-icon"><Upload size={31} /></span><strong>{copy.library.dropTitle(dragFileCount)}</strong><span>{copy.library.dropHint}</span><small>{copy.library.pdfOnly}</small></div></div>}
       {toast && <div className="toast"><Check size={16} />{toast}</div>}
     </div>
   )
+}
+
+function UpdateDialog({ language, update, status, progress, error, onClose, onInstall }: { language: Language; update: Update; status: 'available' | 'downloading' | 'installing' | 'error'; progress: number | null; error: string; onClose: () => void; onInstall: () => void }) {
+  const busy = status === 'downloading' || status === 'installing'
+  const isEnglish = language === 'en'
+  const notes = update.body?.trim() || (isEnglish ? 'This release does not include release notes.' : '此版本未提供更新日志。')
+  const statusText = status === 'installing'
+    ? (isEnglish ? 'Installing update and preparing to restart…' : '正在安装更新并准备重启…')
+    : progress === null
+      ? (isEnglish ? 'Downloading update…' : '正在下载更新…')
+      : (isEnglish ? `Downloading update ${progress}%` : `正在下载更新 ${progress}%`)
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && !busy) onClose()
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [busy, onClose])
+
+  return <div className="folder-dialog-backdrop update-dialog-backdrop" role="presentation">
+    <section className="folder-dialog update-dialog" role="dialog" aria-modal="true" aria-labelledby="update-dialog-title">
+      <header className="folder-dialog-header">
+        <div><span className="folder-dialog-eyebrow">{isEnglish ? 'Software update' : '软件更新'}</span><h2 id="update-dialog-title">{isEnglish ? `PhiReader ${update.version} is available` : `PhiReader ${update.version} 已发布`}</h2><p className="update-version">{isEnglish ? `Current version ${update.currentVersion}` : `当前版本 ${update.currentVersion}`}</p></div>
+        <button className="icon-button" type="button" aria-label={isEnglish ? 'Remind me later' : '稍后提醒'} disabled={busy} onClick={onClose}><X size={16} /></button>
+      </header>
+      <div className="update-dialog-content">
+        <strong>{isEnglish ? 'What’s new' : '更新日志'}</strong>
+        <div className="update-notes">{notes}</div>
+        {busy && <div className="update-progress" aria-live="polite"><div className="update-progress-track"><span className={progress === null ? 'indeterminate' : ''} style={progress === null ? undefined : { width: `${progress}%` }} /></div><span><RefreshCw size={13} />{statusText}</span></div>}
+        {status === 'error' && <div className="update-error" role="alert">{isEnglish ? 'Update failed' : '更新失败'}：{error}</div>}
+      </div>
+      <footer className="folder-dialog-footer update-dialog-footer">
+        <span>{isEnglish ? 'Your local library and settings will be preserved.' : '本地论文库与设置不会受影响。'}</span>
+        <div><button className="outline-button" type="button" disabled={busy} onClick={onClose}>{isEnglish ? 'Later' : '稍后提醒'}</button><button className="primary-button" type="button" disabled={busy} onClick={onInstall}>{busy ? <RefreshCw className="spin" size={15} /> : <Download size={15} />}{status === 'error' ? (isEnglish ? 'Try again' : '重试') : (isEnglish ? 'Update now' : '立即更新')}</button></div>
+      </footer>
+    </section>
+  </div>
 }
 
 function EmptyReader({ language, onBack }: { language: Language; onBack: () => void }) {

@@ -39,7 +39,10 @@ jobs:
           if ($tag -notmatch '^v\d+\.\d+\.\d+([-.][0-9A-Za-z.-]+)?$') {
             throw "Release tag must look like v1.2.3 (received '$tag')."
           }
+          $prerelease = $tag.Contains('-')
           "tag=$tag" >> $env:GITHUB_OUTPUT
+          "prerelease=$($prerelease.ToString().ToLowerInvariant())" >> $env:GITHUB_OUTPUT
+          "channel=$(if ($prerelease) { 'beta' } else { 'stable' })" >> $env:GITHUB_OUTPUT
 
       - name: Check out release tag
         uses: actions/checkout@v4
@@ -94,6 +97,17 @@ jobs:
             throw "Tag $env:RELEASE_TAG does not match package ($packageVersion), lockfile ($lockVersion), Tauri ($tauriVersion), and Cargo ($cargoVersion) versions."
           }
 
+      - name: Configure beta update channel
+        if: steps.release.outputs.channel == 'beta'
+        shell: pwsh
+        run: |
+          $path = "src-tauri/tauri.conf.json"
+          $config = Get-Content $path -Raw | ConvertFrom-Json
+          $config.plugins.updater.endpoints = @(
+            "https://github.com/$env:GITHUB_REPOSITORY/releases/download/beta/latest.json"
+          )
+          $config | ConvertTo-Json -Depth 100 | Set-Content $path -Encoding utf8
+
       - name: Build frontend
         run: npm run build
 
@@ -110,13 +124,54 @@ jobs:
         shell: pwsh
         run: ./tools/build_parser_helpers.ps1 -Clean
 
+      - name: Verify updater signing secret
+        shell: pwsh
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:TAURI_SIGNING_PRIVATE_KEY)) {
+            throw "Repository secret TAURI_SIGNING_PRIVATE_KEY is required to publish signed updates."
+          }
+
+      - name: Generate release notes
+        id: release_notes
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ steps.release.outputs.tag }}
+        run: |
+          $notes = gh api --method POST "repos/$env:GITHUB_REPOSITORY/releases/generate-notes" -f "tag_name=$env:RELEASE_TAG" | ConvertFrom-Json
+          $delimiter = [guid]::NewGuid().ToString()
+          "body<<$delimiter" >> $env:GITHUB_OUTPUT
+          $notes.body >> $env:GITHUB_OUTPUT
+          $delimiter >> $env:GITHUB_OUTPUT
+
       - name: Build installers and publish release
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
         with:
           tagName: ${{ steps.release.outputs.tag }}
           releaseName: PhiReader ${{ steps.release.outputs.tag }}
+          releaseBody: ${{ steps.release_notes.outputs.body }}
           releaseDraft: false
-          prerelease: false
-          includeUpdaterJson: false
+          prerelease: ${{ steps.release.outputs.prerelease }}
+          includeUpdaterJson: true
+          updaterJsonPreferNsis: true
+
+      - name: Update beta channel manifest
+        if: steps.release.outputs.channel == 'beta'
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ steps.release.outputs.tag }}
+        run: |
+          $downloadDir = Join-Path $env:RUNNER_TEMP "phireader-beta-manifest"
+          New-Item -ItemType Directory -Force $downloadDir | Out-Null
+          gh release download $env:RELEASE_TAG --pattern latest.json --dir $downloadDir
+          gh release view beta *> $null
+          if ($LASTEXITCODE -ne 0) {
+            gh release create beta --prerelease --target $env:GITHUB_SHA --title "PhiReader Beta Update Channel" --notes "Machine-managed update manifest for PhiReader beta builds."
+          }
+          gh release upload beta (Join-Path $downloadDir "latest.json") --clobber

@@ -1,6 +1,6 @@
 [package]
 name = "phireader"
-version = "0.1.0"
+version = "0.1.1-beta.1"
 description = "PhiReader desktop shell"
 authors = ["PhiReader"]
 license = "MIT"
@@ -15,6 +15,8 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 keyring = "3"
 reqwest = { version = "0.13.1", features = ["json"] }
+tauri-plugin-process = "2"
+tauri-plugin-updater = "2"
 
 [features]
 custom-protocol = ["tauri/custom-protocol"]

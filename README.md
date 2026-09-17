@@ -91,6 +91,19 @@ src-tauri\target\release\bundle\
 
 安装后即可使用。
 
+## 发布自动更新版本
+
+桌面版会在启动时检查 GitHub Releases。发现更高版本后，会显示版本号和 Release 更新日志；用户确认后，应用会下载经过签名验证的更新、安装并自动重启。
+
+首次启用发布流程时，在 GitHub 仓库的 **Settings → Secrets and variables → Actions** 中新增名为 `TAURI_SIGNING_PRIVATE_KEY` 的 Repository secret，其值为本地 `.tauri/phireader.key` 的完整内容。该私钥已被 Git 忽略，请另行安全备份；丢失后，已安装的旧版本无法信任用新密钥签名的更新。
+
+发布新版本前，将 `package.json`、`package-lock.json`、`src-tauri/Cargo.toml` 和 `src-tauri/tauri.conf.json` 中的版本号同步更新。Release 工作流支持两个相互隔离的更新通道：
+
+- `vX.Y.Z`：正式版本，发布为稳定 Release；正式版只检查 GitHub 的最新稳定版本。
+- `vX.Y.Z-beta.N`：测试版本，发布为 Prerelease；测试版只检查固定的 beta 通道，不会向正式版用户推送。
+
+推送匹配标签后，工作流会自动生成更新日志、安装包、签名文件和 `latest.json`。beta 构建完成后还会刷新 `beta` Release 中的通道清单，已安装的测试版因而可以继续收到后续测试版本。测试通过后再将功能分支合并到 `main`，并以新的稳定版本号发布正式标签。
+
 ## 当前状态
 
 PhiReader 仍处于早期公开阶段，目前优先支持 Windows 与可提取文本的 PDF。扫描版论文、极少见字体或特殊排版的识别仍在开发中，欢迎您反馈您的使用体验，我会尽快修复您提出的问题。

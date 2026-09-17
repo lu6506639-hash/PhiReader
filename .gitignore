@@ -14,6 +14,7 @@ parser/release/*
 !parser/release/.gitkeep
 .tmp-pyinstaller/
 .venv-parser-build/
+.tauri/
 data/library/
 data/uploads/
 *.log
