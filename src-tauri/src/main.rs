@@ -10,6 +10,20 @@ use std::sync::Mutex;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use tauri::Manager;
 
+#[cfg(windows)]
+fn hide_child_window(command: &mut Command) {
+    use std::os::windows::process::CommandExt;
+
+    // Keep parser helpers from opening a transient console window. The
+    // helpers are console applications (both the Python interpreter and the
+    // bundled PyInstaller executables), so CREATE_NO_WINDOW is the Windows
+    // process flag designed for this case.
+    command.creation_flags(0x08000000);
+}
+
+#[cfg(not(windows))]
+fn hide_child_window(_command: &mut Command) {}
+
 static FOLDER_STORE_LOCK: Mutex<()> = Mutex::new(());
 const API_KEY_SERVICE: &str = "com.phireader.desktop";
 const QWEN_CHAT_ENDPOINT: &str =
@@ -761,6 +775,7 @@ fn run_parser(tool: &Path, bundled: bool, pdf: &Path, output: &Path) -> Result<(
         command.arg(tool);
         command
     };
+    hide_child_window(&mut command);
     let result = command
         .arg(pdf)
         .arg("--out")
@@ -790,6 +805,7 @@ fn run_renderer(
         command.arg(tool);
         command
     };
+    hide_child_window(&mut command);
     let result = command
         .arg(pdf)
         .arg(page.to_string())
