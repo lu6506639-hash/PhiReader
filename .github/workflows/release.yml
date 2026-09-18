@@ -148,10 +148,15 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           RELEASE_TAG: ${{ steps.release.outputs.tag }}
         run: |
-          $notes = gh api --method POST "repos/$env:GITHUB_REPOSITORY/releases/generate-notes" -f "tag_name=$env:RELEASE_TAG" | ConvertFrom-Json
+          $notesPath = Join-Path "release-notes" "$env:RELEASE_TAG.md"
+          if (Test-Path $notesPath) {
+            $body = Get-Content $notesPath -Raw
+          } else {
+            $body = (gh api --method POST "repos/$env:GITHUB_REPOSITORY/releases/generate-notes" -f "tag_name=$env:RELEASE_TAG" | ConvertFrom-Json).body
+          }
           $delimiter = [guid]::NewGuid().ToString()
           "body<<$delimiter" >> $env:GITHUB_OUTPUT
-          $notes.body >> $env:GITHUB_OUTPUT
+          $body.TrimEnd() >> $env:GITHUB_OUTPUT
           $delimiter >> $env:GITHUB_OUTPUT
 
       - name: Build installers and publish release
