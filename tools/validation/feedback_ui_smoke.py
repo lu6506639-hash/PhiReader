@@ -28,7 +28,7 @@ with sync_playwright() as playwright:
     assert parsed.path == "/lu6506639-hash/PhiReader/issues/new"
     assert query["title"] == ["[反馈] "]
     body = query["body"][0]
-    assert "PhiReader 版本：0.1.5" in body
+    assert "PhiReader 版本：0.1.6" in body
     assert "界面语言：zh-CN" in body
     assert "运行环境：网页预览" in body
     assert "系统信息：Mozilla/5.0" in body
