@@ -1757,6 +1757,37 @@ mod tests {
         assert!(!valid_api_key_provider("../other"));
     }
 
+    #[cfg(windows)]
+    #[test]
+    fn api_key_storage_survives_a_new_entry() {
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("system clock must be after the Unix epoch")
+            .as_nanos();
+        let service = format!("{API_KEY_SERVICE}.test.{}.{}", std::process::id(), unique);
+        let user = "qwen";
+        let expected = "phireader-keyring-roundtrip";
+
+        let writer = keyring::Entry::new(&service, user).expect("create keyring writer");
+        writer
+            .set_password(expected)
+            .expect("store test credential");
+        drop(writer);
+
+        let reader = keyring::Entry::new(&service, user).expect("create keyring reader");
+        let actual = reader.get_password();
+        if actual.is_ok() {
+            reader
+                .delete_credential()
+                .expect("remove test credential after verification");
+        }
+
+        match actual {
+            Ok(actual) => assert_eq!(actual, expected),
+            Err(error) => panic!("credential was not available to a new entry: {error}"),
+        }
+    }
+
     #[test]
     fn official_model_endpoints_cannot_be_overridden() {
         assert_eq!(
